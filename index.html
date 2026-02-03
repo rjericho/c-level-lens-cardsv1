@@ -10,8 +10,8 @@
       --bg: #f6f3ee;
       --ink: #111;
       --muted: rgba(0,0,0,.62);
-      --rule: rgba(0,0,0,.12);
 
+      /* background drift vars */
       --px: 0px;
       --py: 0px;
       --hue: 24deg;
@@ -28,7 +28,7 @@
       overflow-x: hidden;
     }
 
-    /* Background */
+    /* Soft drifting background */
     .bg {
       position: fixed;
       inset: 0;
@@ -45,53 +45,111 @@
         radial-gradient(1200px 800px at 15% 10%, rgba(255,255,255,.55), transparent 60%),
         radial-gradient(900px 700px at 85% 30%, rgba(255,255,255,.35), transparent 62%),
         radial-gradient(900px 900px at 40% 90%, rgba(255,255,255,.25), transparent 58%),
-        radial-gradient(1400px 900px at 70% 110%, rgba(0,0,0,.035), transparent 60%);
+        radial-gradient(1400px 900px at 70% 110%, rgba(0,0,0,.04), transparent 62%);
       filter: hue-rotate(var(--hue));
-      opacity: .9;
+      opacity: .95;
     }
 
+    /* Overall page width */
     .wrap{
-      max-width: 760px;
+      max-width: 860px;
       margin: 0 auto;
-      padding: 80px 22px 120px;
+      padding: 0 18px;
     }
 
-    /* HERO (Card 0) */
-    .hero{
-      padding: 80px 0 90px;
+    /* This creates the “one idea per screen” experience:
+       - each section is sticky
+       - spacer gives it room to scroll
+    */
+    .stack{
+      position: relative;
+      padding: 0;
+      margin: 0;
     }
+
+    .spacer{
+      height: 20vh;
+    }
+
+    section.card{
+      position: sticky;
+      top: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 0;
+    }
+
+    /* The actual card panel */
+    .panel{
+      width: min(760px, 100%);
+      padding: clamp(24px, 4vw, 44px);
+      border-radius: 22px;
+      background: rgba(246, 243, 238, 0.62);
+      border: 1px solid rgba(0,0,0,.10);
+      box-shadow: 0 10px 30px rgba(0,0,0,.06);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transform: translateY(10px);
+      opacity: 0.001;
+      transition: opacity 420ms ease, transform 520ms ease;
+    }
+
+    /* Reveal when in view */
+    section.card.is-visible .panel{
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* Hero (Card 0) gets special treatment */
+    section.hero .panel{
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      backdrop-filter: none;
+      padding: 0;
+      width: min(900px, 100%);
+    }
+
     .hero h2{
-      font-size: clamp(40px, 5vw, 56px);
-      line-height: 1.1;
+      font-size: clamp(44px, 6vw, 64px);
+      line-height: 1.08;
       letter-spacing: -0.02em;
       margin: 0;
-      max-width: 20ch;
+      max-width: 22ch;
     }
-
-    section{
-      padding: 54px 0 58px;
-      border-bottom: 1px solid var(--rule);
-    }
-    section:last-of-type{ border-bottom: none; }
 
     h2{
-      font-size: 22px;
-      line-height: 1.25;
+      font-size: clamp(22px, 2.6vw, 28px);
+      line-height: 1.2;
       letter-spacing: -0.01em;
       margin: 0 0 14px 0;
     }
 
     p{
       margin: 0;
-      color: rgba(0,0,0,.78);
-      max-width: 68ch;
+      color: rgba(0,0,0,.80);
+      max-width: 70ch;
       white-space: pre-wrap;
+      font-size: 18px;
+      line-height: 1.6;
     }
 
-    .smallnote{
-      margin-top: 36px;
+    .foot{
+      padding: 50px 0 90px;
       color: var(--muted);
       font-size: 14px;
+      text-align: center;
+    }
+
+    /* Better on short viewports */
+    @media (max-height: 720px){
+      .spacer{ height: 14vh; }
+    }
+
+    /* Reduce motion accessibility */
+    @media (prefers-reduced-motion: reduce){
+      .panel{ transition: none; transform: none; opacity: 1; }
     }
   </style>
 </head>
@@ -100,112 +158,178 @@
   <div class="bg" aria-hidden="true"></div>
 
   <div class="wrap">
-    <main id="cards"></main>
-    <div class="smallnote">Edited via cards.csv · Hosted on GitHub Pages</div>
+    <div class="spacer"></div>
+    <main id="cards" class="stack"></main>
+    <div class="foot">Edited via <code>cards.csv</code> · Hosted on GitHub Pages</div>
   </div>
 
   <script>
+    // Load CSV from repo root
     async function loadCSV(path){
       const res = await fetch(path, { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed to load " + path);
+      if (!res.ok) throw new Error("Failed to load " + path + " (" + res.status + ")");
       const text = await res.text();
       return parseCSV(text);
     }
 
+    // Minimal CSV parser supporting quoted fields with commas and escaped quotes.
     function parseCSV(text){
       const rows = [];
       let i = 0, field = "", row = [], inQuotes = false;
 
       while (i < text.length){
         const c = text[i];
+
         if (inQuotes){
           if (c === '"'){
-            if (text[i+1] === '"'){ field += '"'; i+=2; continue; }
+            if (text[i+1] === '"'){ field += '"'; i += 2; continue; }
             inQuotes = false; i++; continue;
+          } else {
+            field += c; i++; continue;
+          }
+        } else {
+          if (c === '"'){ inQuotes = true; i++; continue; }
+          if (c === ','){ row.push(field); field = ""; i++; continue; }
+          if (c === '\r'){ i++; continue; }
+          if (c === '\n'){
+            row.push(field); field = "";
+            if (row.some(x => x.trim() !== "")) rows.push(row);
+            row = []; i++; continue;
           }
           field += c; i++; continue;
         }
-        if (c === '"'){ inQuotes = true; i++; continue; }
-        if (c === ','){ row.push(field); field=""; i++; continue; }
-        if (c === '\n'){
-          row.push(field);
-          if (row.some(x => x.trim() !== "")) rows.push(row);
-          row=[]; field=""; i++; continue;
-        }
-        if (c !== '\r') field += c;
-        i++;
       }
       row.push(field);
       if (row.some(x => x.trim() !== "")) rows.push(row);
 
-      const header = rows.shift();
+      const header = rows.shift().map(h => h.trim());
       return rows.map(r => {
         const o = {};
-        header.forEach((h, idx) => o[h] = (r[idx] || "").trim());
+        header.forEach((h, idx) => o[h] = (r[idx] ?? "").trim());
         return o;
       });
     }
 
     function el(tag, attrs={}, children=[]){
-      const n = document.createElement(tag);
-      Object.entries(attrs).forEach(([k,v]) => {
-        if (k === "text") n.textContent = v;
-        else n.setAttribute(k,v);
+      const node = document.createElement(tag);
+      for (const [k,v] of Object.entries(attrs)){
+        if (k === "text") node.textContent = v;
+        else node.setAttribute(k, v);
+      }
+      (Array.isArray(children) ? children : [children]).forEach(ch => {
+        if (ch == null) return;
+        if (typeof ch === "string") node.appendChild(document.createTextNode(ch));
+        else node.appendChild(ch);
       });
-      (Array.isArray(children)?children:[children]).forEach(c=>{
-        if (!c) return;
-        if (typeof c === "string") n.appendChild(document.createTextNode(c));
-        else n.appendChild(c);
-      });
-      return n;
+      return node;
+    }
+
+    function makeCard({ id, headline, body }){
+      const section = el("section", { class: "card" }, []);
+      if (id === 0) section.classList.add("hero");
+
+      const panelChildren = [ el("h2", {}, headline) ];
+      if (id !== 0 && body) panelChildren.push(el("p", {}, body));
+
+      const panel = el("div", { class: "panel" }, panelChildren);
+      section.appendChild(panel);
+
+      return section;
     }
 
     function render(cards){
       const main = document.getElementById("cards");
       main.innerHTML = "";
-      const sorted = cards.sort((a,b)=>Number(a.card_id)-Number(b.card_id));
+
+      const sorted = [...cards].sort((a,b) => Number(a.card_id) - Number(b.card_id));
 
       for (const c of sorted){
         const id = Number(c.card_id);
-        if (id === 0){
-          main.appendChild(
-            el("section",{class:"hero"},[
-              el("h2",{},c.new_headline)
-            ])
-          );
-          continue;
-        }
-        main.appendChild(
-          el("section",{},[
-            el("h2",{},c.new_headline),
-            c.new_body ? el("p",{},c.new_body) : null
-          ])
-        );
+        const headline = c.new_headline || "";
+        const body = c.new_body || "";
+        main.appendChild(makeCard({ id, headline, body }));
       }
+
+      // Add bottom spacer so last sticky panel can release nicely
+      main.appendChild(el("div", { style: "height: 35vh" }, ""));
     }
 
-    // background drift
-    (function(){
+    // Reveal cards when they enter viewport (drives panel fade)
+    function setupVisibilityObserver(){
+      const io = new IntersectionObserver((entries) => {
+        for (const e of entries){
+          if (e.isIntersecting) e.target.classList.add("is-visible");
+        }
+      }, { threshold: 0.35 });
+
+      document.querySelectorAll("section.card").forEach(s => io.observe(s));
+    }
+
+    // Background drift: reacts to scroll progress + scroll velocity
+    (function backgroundDrift(){
       const root = document.documentElement;
-      let lastY = window.scrollY, lastT = performance.now(), raf=0, v=0;
+      let lastY = window.scrollY || 0;
+      let lastT = performance.now();
+      let v = 0, raf = 0;
+
+      function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
 
       function tick(){
-        const y = window.scrollY, t = performance.now();
-        const dy = y-lastY, dt=Math.max(16,t-lastT);
-        v = v*0.85 + Math.abs(dy/dt)*0.15;
-        const s = y / Math.max(1,document.body.scrollHeight-innerHeight);
-        root.style.setProperty("--px",(Math.sin(s*6.28)*18*v).toFixed(1)+"px");
-        root.style.setProperty("--py",((s-.5)*22*v).toFixed(1)+"px");
-        root.style.setProperty("--hue",(24+v*12).toFixed(1)+"deg");
-        lastY=y; lastT=t;
-        raf = v>0.01 ? requestAnimationFrame(tick):0;
+        const now = performance.now();
+        const y = window.scrollY || 0;
+        const dt = Math.max(16, now - lastT);
+        const dy = y - lastY;
+
+        // scroll velocity proxy
+        const vTarget = Math.abs(dy) / dt;
+        v = v * 0.86 + vTarget * 0.14;
+        const intensity = clamp(v * 18, 0, 1);
+
+        const doc = document.documentElement;
+        const max = Math.max(1, doc.scrollHeight - doc.clientHeight);
+        const s = y / max;
+
+        const amp = 3 + intensity * 22;
+        const px = Math.sin(s * Math.PI * 2.0) * amp;
+        const py = (s - 0.5) * amp * 1.4;
+        const hue = 24 + intensity * 12;
+
+        root.style.setProperty("--px", px.toFixed(2) + "px");
+        root.style.setProperty("--py", py.toFixed(2) + "px");
+        root.style.setProperty("--hue", hue.toFixed(2) + "deg");
+
+        lastY = y; lastT = now;
+
+        if (intensity > 0.01) raf = requestAnimationFrame(tick);
+        else raf = 0;
       }
-      addEventListener("scroll",()=>!raf&&(raf=requestAnimationFrame(tick)),{passive:true});
+
+      function onScroll(){
+        if (!raf) raf = requestAnimationFrame(tick);
+      }
+
+      onScroll();
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", onScroll);
     })();
 
-    loadCSV("cards.csv").then(render).catch(e=>{
-      document.getElementById("cards").textContent = e;
-    });
+    // Boot
+    (async function(){
+      try{
+        const cards = await loadCSV("cards.csv");
+        render(cards);
+        setupVisibilityObserver();
+      } catch (e){
+        const main = document.getElementById("cards");
+        main.innerHTML = "";
+        main.appendChild(el("section", { class: "card is-visible" }, [
+          el("div", { class: "panel" }, [
+            el("h2", {}, "Couldn’t load cards.csv"),
+            el("p", {}, String(e))
+          ])
+        ]));
+      }
+    })();
   </script>
 </body>
 </html>
