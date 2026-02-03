@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>C-Level Lens</title>
+
+  <style>
+    :root{
+      --bg: #f6f3ee;
+      --ink: #111;
+      --muted: rgba(0,0,0,.62);
+      --rule: rgba(0,0,0,.12);
+
+      --px: 0px;
+      --py: 0px;
+      --hue: 24deg;
+    }
+
+    html, body { height: 100%; }
+    body{
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font: 18px/1.55 ui-serif, Georgia, "Times New Roman", Times, serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+
+    /* Background */
+    .bg {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      pointer-events: none;
+      background: var(--bg);
+    }
+    .bg::before{
+      content:"";
+      position:absolute;
+      inset:-20%;
+      transform: translate3d(var(--px), var(--py), 0) scale(1.05);
+      background:
+        radial-gradient(1200px 800px at 15% 10%, rgba(255,255,255,.55), transparent 60%),
+        radial-gradient(900px 700px at 85% 30%, rgba(255,255,255,.35), transparent 62%),
+        radial-gradient(900px 900px at 40% 90%, rgba(255,255,255,.25), transparent 58%),
+        radial-gradient(1400px 900px at 70% 110%, rgba(0,0,0,.035), transparent 60%);
+      filter: hue-rotate(var(--hue));
+      opacity: .9;
+    }
+
+    .wrap{
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 80px 22px 120px;
+    }
+
+    /* HERO (Card 0) */
+    .hero{
+      padding: 80px 0 90px;
+    }
+    .hero h2{
+      font-size: clamp(40px, 5vw, 56px);
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      margin: 0;
+      max-width: 20ch;
+    }
+
+    section{
+      padding: 54px 0 58px;
+      border-bottom: 1px solid var(--rule);
+    }
+    section:last-of-type{ border-bottom: none; }
+
+    h2{
+      font-size: 22px;
+      line-height: 1.25;
+      letter-spacing: -0.01em;
+      margin: 0 0 14px 0;
+    }
+
+    p{
+      margin: 0;
+      color: rgba(0,0,0,.78);
+      max-width: 68ch;
+      white-space: pre-wrap;
+    }
+
+    .smallnote{
+      margin-top: 36px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="bg" aria-hidden="true"></div>
+
+  <div class="wrap">
+    <main id="cards"></main>
+    <div class="smallnote">Edited via cards.csv · Hosted on GitHub Pages</div>
+  </div>
+
+  <script>
+    async function loadCSV(path){
+      const res = await fetch(path, { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load " + path);
+      const text = await res.text();
+      return parseCSV(text);
+    }
+
+    function parseCSV(text){
+      const rows = [];
+      let i = 0, field = "", row = [], inQuotes = false;
+
+      while (i < text.length){
+        const c = text[i];
+        if (inQuotes){
+          if (c === '"'){
+            if (text[i+1] === '"'){ field += '"'; i+=2; continue; }
+            inQuotes = false; i++; continue;
+          }
+          field += c; i++; continue;
+        }
+        if (c === '"'){ inQuotes = true; i++; continue; }
+        if (c === ','){ row.push(field); field=""; i++; continue; }
+        if (c === '\n'){
+          row.push(field);
+          if (row.some(x => x.trim() !== "")) rows.push(row);
+          row=[]; field=""; i++; continue;
+        }
+        if (c !== '\r') field += c;
+        i++;
+      }
+      row.push(field);
+      if (row.some(x => x.trim() !== "")) rows.push(row);
+
+      const header = rows.shift();
+      return rows.map(r => {
+        const o = {};
+        header.forEach((h, idx) => o[h] = (r[idx] || "").trim());
+        return o;
+      });
+    }
+
+    function el(tag, attrs={}, children=[]){
+      const n = document.createElement(tag);
+      Object.entries(attrs).forEach(([k,v]) => {
+        if (k === "text") n.textContent = v;
+        else n.setAttribute(k,v);
+      });
+      (Array.isArray(children)?children:[children]).forEach(c=>{
+        if (!c) return;
+        if (typeof c === "string") n.appendChild(document.createTextNode(c));
+        else n.appendChild(c);
+      });
+      return n;
+    }
+
+    function render(cards){
+      const main = document.getElementById("cards");
+      main.innerHTML = "";
+      const sorted = cards.sort((a,b)=>Number(a.card_id)-Number(b.card_id));
+
+      for (const c of sorted){
+        const id = Number(c.card_id);
+        if (id === 0){
+          main.appendChild(
+            el("section",{class:"hero"},[
+              el("h2",{},c.new_headline)
+            ])
+          );
+          continue;
+        }
+        main.appendChild(
+          el("section",{},[
+            el("h2",{},c.new_headline),
+            c.new_body ? el("p",{},c.new_body) : null
+          ])
+        );
+      }
+    }
+
+    // background drift
+    (function(){
+      const root = document.documentElement;
+      let lastY = window.scrollY, lastT = performance.now(), raf=0, v=0;
+
+      function tick(){
+        const y = window.scrollY, t = performance.now();
+        const dy = y-lastY, dt=Math.max(16,t-lastT);
+        v = v*0.85 + Math.abs(dy/dt)*0.15;
+        const s = y / Math.max(1,document.body.scrollHeight-innerHeight);
+        root.style.setProperty("--px",(Math.sin(s*6.28)*18*v).toFixed(1)+"px");
+        root.style.setProperty("--py",((s-.5)*22*v).toFixed(1)+"px");
+        root.style.setProperty("--hue",(24+v*12).toFixed(1)+"deg");
+        lastY=y; lastT=t;
+        raf = v>0.01 ? requestAnimationFrame(tick):0;
+      }
+      addEventListener("scroll",()=>!raf&&(raf=requestAnimationFrame(tick)),{passive:true});
+    })();
+
+    loadCSV("cards.csv").then(render).catch(e=>{
+      document.getElementById("cards").textContent = e;
+    });
+  </script>
+</body>
+</html>
