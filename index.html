@@ -36,20 +36,21 @@
       pointer-events: none;
       background: var(--bg);
     }
-    .bg::before{
-      content:"";
-      position:absolute;
-      inset:-20%;
-      transform: translate3d(var(--px), var(--py), 0) scale(1.06);
-      background:
-        radial-gradient(900px 700px at 10% 20%, rgba(255, 120, 170, .25), transparent 60%),
-        radial-gradient(900px 700px at 85% 25%, rgba(255, 170, 90, .22), transparent 60%),
-        radial-gradient(900px 900px at 30% 95%, rgba(170, 140, 255, .18), transparent 60%),
-        radial-gradient(1400px 900px at 75% 110%, rgba(0,0,0,.05), transparent 62%),
-        radial-gradient(1200px 900px at 50% 50%, rgba(255,255,255,.35), transparent 62%);
-      filter: hue-rotate(var(--hue));
-      opacity: .95;
-    }
+.bg::before{
+  content:"";
+  position:absolute;
+  inset:-20%;
+  transform: translate3d(var(--px), var(--py), 0) scale(1.06);
+  background:
+    radial-gradient(900px 700px at 10% 20%, rgba(255, 70, 150, .42), transparent 62%),
+    radial-gradient(900px 700px at 88% 18%, rgba(255, 170, 60, .38), transparent 62%),
+    radial-gradient(900px 900px at 28% 92%, rgba(150, 120, 255, .34), transparent 62%),
+    radial-gradient(1200px 900px at 78% 110%, rgba(0,0,0,.08), transparent 64%),
+    radial-gradient(1200px 900px at 50% 50%, rgba(255,255,255,.26), transparent 66%);
+  filter: hue-rotate(var(--hue)) saturate(1.25);
+  opacity: 1;
+}
+
     .bg::after{
       content:"";
       position:absolute;
@@ -81,7 +82,7 @@
 
     .stage{
       /* This is the runway. Increase if you want slower transitions. */
-      min-height: 150vh;
+      min-height: 220vh;
       display: grid;
       align-items: center;
     }
@@ -299,10 +300,13 @@
         const max = Math.max(1, doc.scrollHeight - doc.clientHeight);
         const s = y / max;
 
-        const amp = 4 + intensity * 26;
-        const px = Math.sin(s * Math.PI * 2.0) * amp;
-        const py = (s - 0.5) * amp * 1.5;
-        const hue = 18 + intensity * 18;
+        // add slow continuous motion so background feels alive even when not scrolling
+        const t2 = now / 1800; // speed of ambient drift (bigger = slower)
+
+        const amp = 8 + intensity * 34;   // stronger overall motion
+        const px = (Math.sin(s * Math.PI * 2.0) * amp) + (Math.sin(t2) * 10);
+        const py = ((s - 0.5) * amp * 1.7) + (Math.cos(t2 * 0.9) * 8);
+        const hue = 18 + intensity * 22 + (Math.sin(t2 * 0.6) * 6);
 
         root.style.setProperty("--px", px.toFixed(2) + "px");
         root.style.setProperty("--py", py.toFixed(2) + "px");
