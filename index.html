@@ -84,11 +84,15 @@
        Each card lives inside a tall "stage". The panel is sticky within that stage.
        That gives the old card room to slide away as the next arrives.
     */
-    .stack{
-      position: relative;
-      margin: 0;
-      padding: 0;
-    }
+      .stack{
+        position: relative;
+        margin: 0;
+        padding: 0;
+      
+        /* NEW: allow scene backgrounds to go full-bleed */
+        width: 100vw;
+        margin-left: calc(50% - 50vw);
+      }
 
     .stage{
       /* This is the runway. Increase if you want slower transitions. */
