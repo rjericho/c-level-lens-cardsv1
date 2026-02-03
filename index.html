@@ -36,7 +36,7 @@
       pointer-events: none;
       background: var(--bg);
     }
-.bg::before{
+    .bg::before{
   content:"";
   position:absolute;
   inset:-20%;
@@ -62,6 +62,20 @@
         repeating-linear-gradient(90deg, rgba(0,0,0,.015), rgba(0,0,0,.015) 1px, transparent 1px, transparent 3px);
       transform: translate3d(calc(var(--px) * .25), calc(var(--py) * .25), 0);
     }
+.stage{
+  position: relative;
+}
+
+.stage::before{
+  content:"";
+  position:absolute;
+  inset:-14%;
+  z-index:-1;
+  opacity: 1;
+  background: var(--scene-bg);
+  transform: translate3d(var(--sx, 0px), var(--sy, 0px), 0) scale(1.02);
+  transition: opacity 600ms ease, transform 600ms ease;
+  filter: saturate(1.25) contrast(1.02);
 
     /* Page width */
     .wrap{
@@ -96,22 +110,24 @@
       padding: 0;
     }
 
-    .panel{
-      width: min(760px, 100%);
-      padding: clamp(24px, 4vw, 44px);
-      border-radius: 22px;
+.panel{
+  width: min(760px, 100%);
+  padding: clamp(28px, 5vw, 56px);
 
-      /* Make background visible through the panel */
-      background: rgba(246, 243, 238, 0.48);
-      border: 1px solid rgba(0,0,0,.10);
-      box-shadow: 0 12px 35px rgba(0,0,0,.08);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 
-      transform: translateY(12px);
-      opacity: 0.001;
-      transition: opacity 420ms ease, transform 520ms ease;
-    }
+  /* NEW: helps readability without looking like a card */
+  text-shadow: 0 1px 18px rgba(0,0,0,.07);
+
+  transform: translateY(12px);
+  opacity: 0.001;
+  transition: opacity 520ms ease, transform 620ms ease;
+}
+
 
     .card.is-visible .panel{
       opacity: 1;
@@ -235,19 +251,51 @@
       });
       return node;
     }
+      const SCENES = [
+        [
+          "radial-gradient(900px 700px at 28% 18%, rgba(255,90,170,.55), transparent 62%)",
+          "radial-gradient(1100px 900px at 78% 70%, rgba(255,190,90,.22), transparent 66%)",
+          "radial-gradient(1200px 900px at 50% 110%, rgba(0,0,0,.06), transparent 70%)"
+        ].join(","),
+        [
+          "radial-gradient(900px 700px at 72% 22%, rgba(255,170,70,.52), transparent 62%)",
+          "radial-gradient(1000px 900px at 22% 78%, rgba(140,160,255,.22), transparent 66%)",
+          "radial-gradient(1200px 900px at 50% 110%, rgba(0,0,0,.06), transparent 70%)"
+        ].join(","),
+        [
+          "radial-gradient(900px 800px at 35% 78%, rgba(130,150,255,.50), transparent 62%)",
+          "radial-gradient(1000px 800px at 82% 20%, rgba(255,120,190,.20), transparent 66%)",
+          "radial-gradient(1200px 900px at 50% 110%, rgba(0,0,0,.06), transparent 70%)"
+        ].join(","),
+        [
+          "radial-gradient(900px 800px at 68% 70%, rgba(110,220,200,.48), transparent 62%)",
+          "radial-gradient(1000px 800px at 20% 18%, rgba(255,190,90,.20), transparent 66%)",
+          "radial-gradient(1200px 900px at 50% 110%, rgba(0,0,0,.06), transparent 70%)"
+        ].join(",")
+      ];
 
-    function makeStageCard({ id, headline, body }){
-      const stage = el("div", { class: "stage" }, []);
-      const card = el("section", { class: "card" }, []);
-      if (id === 0) card.classList.add("hero");
+    
+      function makeStageCard({ id, headline, body }){
+        const stage = el("div", { class: "stage" }, []);
+      
+        // NEW: set the per-card scene background on the stage
+        const scene = SCENES[id % SCENES.length];
+        stage.style.setProperty("--scene-bg", scene);
 
-      const panelKids = [ el("h2", {}, headline) ];
-      if (id !== 0 && body) panelKids.push(el("p", {}, body));
+        stage.style.setProperty("--sx", ((id % 3) - 1) * 10 + "px");
+        stage.style.setProperty("--sy", (((id + 1) % 3) - 1) * 8 + "px");
+      
+        const card = el("section", { class: "card" }, []);
+        if (id === 0) card.classList.add("hero");
+      
+        const panelKids = [ el("h2", {}, headline) ];
+        if (id !== 0 && body) panelKids.push(el("p", {}, body));
+      
+        card.appendChild(el("div", { class: "panel" }, panelKids));
+        stage.appendChild(card);
+        return stage;
+      }
 
-      card.appendChild(el("div", { class: "panel" }, panelKids));
-      stage.appendChild(card);
-      return stage;
-    }
 
     function render(cards){
       const main = document.getElementById("cards");
