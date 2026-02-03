@@ -62,10 +62,6 @@
         repeating-linear-gradient(90deg, rgba(0,0,0,.015), rgba(0,0,0,.015) 1px, transparent 1px, transparent 3px);
       transform: translate3d(calc(var(--px) * .25), calc(var(--py) * .25), 0);
     }
-.stage{
-  position: relative;
-}
-
 .stage::before{
   content:"";
   position:absolute;
@@ -76,7 +72,7 @@
   transform: translate3d(var(--sx, 0px), var(--sy, 0px), 0) scale(1.02);
   transition: opacity 600ms ease, transform 600ms ease;
   filter: saturate(1.25) contrast(1.02);
-
+}
     /* Page width */
     .wrap{
       max-width: 900px;
