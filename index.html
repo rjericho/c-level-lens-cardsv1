@@ -67,11 +67,14 @@
   position:absolute;
   inset:-14%;
   z-index:-1;
-  opacity: 1;
+  opacity: .22;
   background: var(--scene-bg);
   transform: translate3d(var(--sx, 0px), var(--sy, 0px), 0) scale(1.02);
-  transition: opacity 600ms ease, transform 600ms ease;
+  transition: opacity 700ms ease, transform 700ms ease;
   filter: saturate(1.25) contrast(1.02);
+}
+.stage.is-active::before{
+  opacity: 1;  /*active scene */
 }
     /* Page width */
     .wrap{
@@ -93,7 +96,49 @@
         width: 100vw;
         margin-left: calc(50% - 50vw);
       }
-
+    /* ===============================
+   FIXED PROGRESS INDICATOR (NEW)
+   =============================== */
+        
+        .progress{
+          position: fixed;
+          left: 18px;
+          top: 50%;
+          transform: translateY(-50%);
+          z-index: 50;
+        
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        
+          padding: 12px 10px;
+          border-radius: 999px;
+        
+          background: rgba(255,255,255,.32);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border: 1px solid rgba(0,0,0,.06);
+        }
+        
+        .progress button{
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          border: none;
+          padding: 0;
+        
+          background: rgba(0,0,0,.22);
+          cursor: pointer;
+        }
+        
+        .progress button:hover{
+          background: rgba(0,0,0,.38);
+        }
+        
+        .progress button.is-active{
+          background: rgba(0,0,0,.72);
+          transform: scale(1.25);
+        }
     .stage{
       /* This is the runway. Increase if you want slower transitions. */
       min-height: 220vh;
@@ -188,6 +233,7 @@
 
 <body>
   <div class="bg" aria-hidden="true"></div>
+   <nav id="progress" class="progress" aria-label="Progress"></nav>
 
   <div class="wrap">
     <main id="cards" class="stack"></main>
@@ -299,33 +345,63 @@
 
 
     function render(cards){
-      const main = document.getElementById("cards");
-      main.innerHTML = "";
+        const main = document.getElementById("cards");
+        main.innerHTML = "";
+      
+        const sorted = [...cards].sort((a,b) => Number(a.card_id) - Number(b.card_id));
+        for (const c of sorted){
+          const id = Number(c.card_id);
+          main.appendChild(makeStageCard({
+            id,
+            headline: c.new_headline || "",
+            body: c.new_body || ""
+          }));
+        }
 
-      const sorted = [...cards].sort((a,b) => Number(a.card_id) - Number(b.card_id));
-      for (const c of sorted){
-        const id = Number(c.card_id);
-        main.appendChild(makeStageCard({
-          id,
-          headline: c.new_headline || "",
-          body: c.new_body || ""
-        }));
-      }
+  buildProgress(sorted.length);
 
+  main.appendChild(el("div", { style: "height: 40vh" }, ""));
+}
       // extra runway at the end so last card releases cleanly
       main.appendChild(el("div", { style: "height: 40vh" }, ""));
     }
 
-    function setupVisibilityObserver(){
-      const io = new IntersectionObserver((entries) => {
-        for (const e of entries){
-          if (e.isIntersecting) e.target.querySelector(".card")?.classList.add("is-visible");
-        }
-      }, { threshold: 0.35 });
+function setupVisibilityObserver(){
+  const stages = Array.from(document.querySelectorAll(".stage"));
+  const dots = Array.from(document.querySelectorAll("#progress button"));
 
-      document.querySelectorAll(".stage").forEach(s => io.observe(s));
+  function setActive(idx){
+    stages.forEach((s,i) => s.classList.toggle("is-active", i === idx));
+    dots.forEach((d,i) => d.classList.toggle("is-active", i === idx));
+  }
+
+  // pick the most visible stage in the viewport
+  const io = new IntersectionObserver((entries) => {
+    let best = { idx: 0, ratio: 0 };
+
+    for (const e of entries){
+      const idx = stages.indexOf(e.target);
+      if (idx === -1) continue;
+
+      // keep your text reveal
+      if (e.isIntersecting) e.target.querySelector(".card")?.classList.add("is-visible");
+
+      // choose active stage by highest intersection ratio
+      if (e.intersectionRatio > best.ratio){
+        best = { idx, ratio: e.intersectionRatio };
+      }
     }
 
+    // only switch when we have a meaningful winner (reduces jitter)
+    if (best.ratio > 0.35) setActive(best.idx);
+
+  }, { threshold: [0.25, 0.35, 0.45, 0.6, 0.75] });
+
+  stages.forEach(s => io.observe(s));
+
+  // default active
+  setActive(0);
+}
     // background drift
     (function backgroundDrift(){
       const root = document.documentElement;
