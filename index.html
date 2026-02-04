@@ -10,6 +10,7 @@
       --bg: #f6f3ee;
       --ink: #111;
       --muted: rgba(0,0,0,.62);
+      --halo: 0; /* 0..1 set by JS */
 
       /* background drift vars */
       --px: 0px;
@@ -188,18 +189,23 @@
 .panel::before{
   content:"";
   position:absolute;
-  inset: -24px -32px;
+  inset: -34px -46px;
   z-index:-1;
 
-  background: linear-gradient(
-    to bottom,
-    rgba(255,255,255,.55),
-    rgba(255,255,255,.35) 60%,
-    rgba(255,255,255,.12)
-  );
+  background: radial-gradient(
+  120% 140% at 50% 38%,
+  rgba(255,255,255, calc(0.46 + var(--halo) * 0.20)) 0%,
+  rgba(255,255,255, calc(0.26 + var(--halo) * 0.14)) 38%,
+  rgba(255,255,255, calc(0.12 + var(--halo) * 0.08)) 60%,
+  rgba(255,255,255, 0) 78%
+);
 
-  border-radius: 18px;
+
+  border-radius: 999px;          /* kills “card corners” */
+  filter: blur(6px);             /* softens any remaining boundary */
+  transform: translateZ(0);      /* avoid jank */
 }
+
 
 
 .card.is-visible .panel{
@@ -529,6 +535,7 @@ function setupVisibilityObserver(){
         const vTarget = Math.abs(dy) / dt;
         v = v * 0.86 + vTarget * 0.14;
         const intensity = clamp(v * 18, 0, 1);
+        root.style.setProperty("--halo", (intensity * 0.9).toFixed(3));
 
         const doc = document.documentElement;
         const max = Math.max(1, doc.scrollHeight - doc.clientHeight);
