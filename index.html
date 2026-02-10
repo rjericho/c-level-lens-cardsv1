@@ -1,0 +1,604 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>C-Level Lens</title>
+cd
+  <style>
+    :root{
+      --bg: #f6f3ee;
+      --ink: #111;
+      --muted: rgba(0,0,0,.62);
+      --halo: 0; /* 0..1 set by JS */
+
+      /* background drift vars */
+      --px: 0px;
+      --py: 0px;
+      --hue: 18deg;
+    }
+
+    html, body { height: 100%; }
+    body{
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font: 18px/1.55 ui-serif, Georgia, "Times New Roman", Times, serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overflow-x: hidden;
+    }
+
+    /* ====== BACKGROUND (make it visible) ====== */
+    .bg {
+      position: fixed;
+      inset: 0;
+      z-index: -2;
+      pointer-events: none;
+      background: var(--bg);
+    }
+    .bg::before{
+  content:"";
+  position:absolute;
+  inset:-20%;
+  transform: translate3d(var(--px), var(--py), 0) scale(1.06);
+  background:
+    radial-gradient(900px 700px at 10% 20%, rgba(255, 70, 150, .42), transparent 62%),
+    radial-gradient(900px 700px at 88% 18%, rgba(255, 170, 60, .38), transparent 62%),
+    radial-gradient(900px 900px at 28% 92%, rgba(150, 120, 255, .34), transparent 62%),
+    radial-gradient(1200px 900px at 78% 110%, rgba(0,0,0,.08), transparent 64%),
+    radial-gradient(1200px 900px at 50% 50%, rgba(255,255,255,.26), transparent 66%);
+  filter: hue-rotate(var(--hue)) saturate(1.25);
+  opacity: 1;
+}
+
+    .bg::after{
+      content:"";
+      position:absolute;
+      inset:0;
+      opacity:.06;
+      mix-blend-mode:multiply;
+      background-image:
+        repeating-linear-gradient(0deg, rgba(0,0,0,.02), rgba(0,0,0,.02) 1px, transparent 1px, transparent 2px),
+        repeating-linear-gradient(90deg, rgba(0,0,0,.015), rgba(0,0,0,.015) 1px, transparent 1px, transparent 3px);
+      transform: translate3d(calc(var(--px) * .25), calc(var(--py) * .25), 0);
+    }
+.stage::before{
+  content:"";
+  position:absolute;
+  inset:-14%;
+  z-index:-1;
+  opacity: .22;
+  background: var(--scene-bg);
+  transform: translate3d(var(--sx, 0px), var(--sy, 0px), 0) scale(1.02);
+  transition: opacity 700ms ease, transform 700ms ease;
+  filter: saturate(1.25) contrast(1.02);
+}
+.stage.is-active::before{
+  opacity: 1;  /*active scene */
+}
+    /* Page width */
+    .wrap{
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 18px;
+    }
+
+    /* ====== STICKY CARD EXPERIENCE (fix stacking) ======
+       Each card lives inside a tall "stage". The panel is sticky within that stage.
+       That gives the old card room to slide away as the next arrives.
+    */
+      .stack{
+        position: relative;
+        margin: 0;
+        padding: 0;
+      
+        /* NEW: allow scene backgrounds to go full-bleed */
+        width: 100vw;
+        margin-left: calc(50% - 50vw);
+      }
+    /* ===============================
+   FIXED PROGRESS INDICATOR (NEW)
+   =============================== */
+        
+        .progress{
+          position: fixed;
+          left: 18px;
+          top: 50%;
+          transform: translateY(-50%);
+          z-index: 50;
+        
+          display: flex;
+          flex-direction: column;
+          gap: 10px;
+        
+          padding: 12px 10px;
+          border-radius: 999px;
+        
+          background: rgba(255,255,255,.32);
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          border: 1px solid rgba(0,0,0,.06);
+        }
+        .progress::before{
+          content: "";
+          position: absolute;
+          top: 12px;
+          bottom: 12px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 2px;
+          background: rgba(0,0,0,.08);
+          z-index: -1;
+        }
+
+        .progress button{
+          width: 10px;
+          height: 10px;
+          border-radius: 50%;
+          border: none;
+          padding: 0;
+        
+          background: rgba(0,0,0,.22);
+          cursor: pointer;
+        }
+        
+        .progress button:hover{
+          background: rgba(0,0,0,.38);
+        }
+        
+        .progress button.is-active{
+          background: rgba(0,0,0,.72);
+          transform: scale(1.25);
+        }
+    .stage{
+      /* This is the runway. Increase if you want slower transitions. */
+      min-height: 220vh;
+      display: grid;
+      align-items: center;
+      position: relative; 
+    }
+
+    .card{
+      position: sticky;
+      top: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 0;
+    }
+
+.panel{
+  position: relative;
+  width: min(760px, 100%);
+  padding: clamp(28px, 5vw, 56px);
+
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+
+  /* NEW: helps readability without looking like a card */
+  text-shadow: 0 1px 8px rgba(0,0,0,.05);
+
+  transform: translateY(12px);
+  opacity: 0.001;
+  transition: opacity 520ms ease, transform 620ms ease;
+}
+.panel::before{
+  content:"";
+  position:absolute;
+  inset: -34px -46px;
+  z-index:-1;
+
+  background: radial-gradient(
+  120% 140% at 50% 38%,
+  rgba(255,255,255, calc(0.34 + var(--halo) * 0.20)) 0%,
+  rgba(255,255,255, calc(0.18 + var(--halo) * 0.14)) 38%,
+  rgba(255,255,255, calc(0.08 + var(--halo) * 0.08)) 60%,
+  rgba(255,255,255, 0) 78%
+);
+
+
+  border-radius: 999px;          /* kills “card corners” */
+  filter: blur(6px);             /* softens any remaining boundary */
+  transform: translateZ(0);      /* avoid jank */
+}
+
+
+
+.card.is-visible .panel{
+  opacity: 1;
+  transform: translateY(0);
+  transition-timing-function: cubic-bezier(.22,.61,.36,1);
+}
+
+
+    /* Hero (Card 0) */
+    .card.hero .panel{
+      background: transparent;
+      border: none;
+      box-shadow: none;
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+      padding: 0;
+      width: min(900px, 100%);
+    }
+    .card.hero .panel::before{
+  display: none;
+}
+    .card.hero h2{
+      font-size: clamp(46px, 6vw, 68px);
+      line-height: 1.06;
+      letter-spacing: -0.02em;
+      margin: 0;
+      max-width: 24ch;
+    }
+
+    h2{
+      font-size: clamp(22px, 2.6vw, 28px);
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+      margin: 0 0 14px 0;
+    }
+
+    p{
+      margin: 0;
+      color: rgba(0,0,0,.90);
+      max-width: 62ch;
+      white-space: pre-wrap;
+      font-size: 18px;
+      line-height: 1.6;
+      font-weight: 450;
+    }
+
+    .foot{
+      padding: 50px 0 90px;
+      color: var(--muted);
+      font-size: 14px;
+      text-align: center;
+    }
+
+    @media (max-height: 720px){
+      .stage{ min-height: 135vh; }
+    }
+
+    @media (prefers-reduced-motion: reduce){
+      .panel{ transition: none; transform: none; opacity: 1; }
+    }
+    /* ===== Mobile responsiveness ===== */
+@media (max-width: 640px){
+
+  /* Give content more usable width */
+  .wrap{
+    padding: 0 14px;
+  }
+
+  /* Make the panel breathe a bit less */
+  .panel{
+    width: 100%;
+    padding: 22px 18px;
+  }
+
+  /* Typography tuning for small screens */
+  .card.hero h2{
+    font-size: clamp(34px, 9vw, 48px);
+    max-width: 20ch;
+  }
+
+  h2{
+    font-size: clamp(20px, 6.5vw, 26px);
+  }
+
+  p{
+    font-size: 16px;
+    line-height: 1.55;
+  }
+
+  /* Move progress from left rail -> bottom stepper */
+  .progress{
+    left: 50%;
+    top: auto;
+    bottom: 14px;
+    transform: translateX(-50%);
+
+    flex-direction: row;
+    gap: 8px;
+
+    padding: 10px 12px;
+    border-radius: 999px;
+  }
+
+  /* Replace vertical spine with horizontal spine */
+  .progress::before{
+    top: 50%;
+    bottom: auto;
+    left: 12px;
+    right: 12px;
+    width: auto;
+    height: 2px;
+    transform: translateY(-50%);
+  }
+
+  /* Slightly smaller dots on mobile */
+  .progress button{
+    width: 9px;
+    height: 9px;
+  }
+}
+
+  </style>
+</head>
+
+<body>
+  <div class="bg" aria-hidden="true"></div>
+   <nav id="progress" class="progress" aria-label="Progress"></nav>
+
+  <div class="wrap">
+    <main id="cards" class="stack"></main>
+    <div class="foot">Edited via <code>cards.csv</code> · Hosted on GitHub Pages</div>
+  </div>
+
+  <script>
+    async function loadCSV(path){
+      const res = await fetch(path, { cache: "no-store" });
+      if (!res.ok) throw new Error("Failed to load " + path + " (" + res.status + ")");
+      const text = await res.text();
+      return parseCSV(text);
+    }
+
+    function parseCSV(text){
+      const rows = [];
+      let i = 0, field = "", row = [], inQuotes = false;
+
+      while (i < text.length){
+        const c = text[i];
+
+        if (inQuotes){
+          if (c === '"'){
+            if (text[i+1] === '"'){ field += '"'; i += 2; continue; }
+            inQuotes = false; i++; continue;
+          } else {
+            field += c; i++; continue;
+          }
+        } else {
+          if (c === '"'){ inQuotes = true; i++; continue; }
+          if (c === ','){ row.push(field); field = ""; i++; continue; }
+          if (c === '\r'){ i++; continue; }
+          if (c === '\n'){
+            row.push(field); field = "";
+            if (row.some(x => x.trim() !== "")) rows.push(row);
+            row = []; i++; continue;
+          }
+          field += c; i++; continue;
+        }
+      }
+      row.push(field);
+      if (row.some(x => x.trim() !== "")) rows.push(row);
+
+      const header = rows.shift().map(h => h.trim());
+      return rows.map(r => {
+        const o = {};
+        header.forEach((h, idx) => o[h] = (r[idx] ?? "").trim());
+        return o;
+      });
+    }
+
+    function el(tag, attrs={}, children=[]){
+      const node = document.createElement(tag);
+      for (const [k,v] of Object.entries(attrs)){
+        if (k === "text") node.textContent = v;
+        else node.setAttribute(k, v);
+      }
+      (Array.isArray(children) ? children : [children]).forEach(ch => {
+        if (ch == null) return;
+        if (typeof ch === "string") node.appendChild(document.createTextNode(ch));
+        else node.appendChild(ch);
+      });
+      return node;
+    }
+    function scrollStageToCenter(stage){
+        const rect = stage.getBoundingClientRect();
+        const top = window.scrollY + rect.top;
+      
+        const target = top + stage.offsetHeight * 0.35;
+      
+        window.scrollTo({
+          top: target,
+          behavior: "smooth"
+        });
+      }
+      const SCENES = [
+        [
+          "radial-gradient(900px 700px at 28% 18%, rgba(255,90,170,.55), transparent 62%)",
+          "radial-gradient(1100px 900px at 78% 70%, rgba(255,190,90,.22), transparent 66%)",
+          "radial-gradient(1200px 900px at 50% 110%, rgba(0,0,0,.06), transparent 70%)"
+        ].join(","),
+        [
+          "radial-gradient(900px 700px at 72% 22%, rgba(255,170,70,.52), transparent 62%)",
+          "radial-gradient(1000px 900px at 22% 78%, rgba(140,160,255,.22), transparent 66%)",
+          "radial-gradient(1200px 900px at 50% 110%, rgba(0,0,0,.06), transparent 70%)"
+        ].join(","),
+        [
+          "radial-gradient(900px 800px at 35% 78%, rgba(130,150,255,.50), transparent 62%)",
+          "radial-gradient(1000px 800px at 82% 20%, rgba(255,120,190,.20), transparent 66%)",
+          "radial-gradient(1200px 900px at 50% 110%, rgba(0,0,0,.06), transparent 70%)"
+        ].join(","),
+        [
+          "radial-gradient(900px 800px at 68% 70%, rgba(110,220,200,.48), transparent 62%)",
+          "radial-gradient(1000px 800px at 20% 18%, rgba(255,190,90,.20), transparent 66%)",
+          "radial-gradient(1200px 900px at 50% 110%, rgba(0,0,0,.06), transparent 70%)"
+        ].join(",")
+      ];
+
+    
+      function makeStageCard({ id, headline, body }){
+        const stage = el("div", { class: "stage" }, []);
+      
+        // NEW: set the per-card scene background on the stage
+        const scene = SCENES[id % SCENES.length];
+        stage.style.setProperty("--scene-bg", scene);
+
+        stage.style.setProperty("--sx", ((id % 3) - 1) * 10 + "px");
+        stage.style.setProperty("--sy", (((id + 1) % 3) - 1) * 8 + "px");
+      
+        const card = el("section", { class: "card" }, []);
+        if (id === 0) card.classList.add("hero");
+      
+        const panelKids = [ el("h2", {}, headline) ];
+        if (id !== 0 && body) panelKids.push(el("p", {}, body));
+      
+        card.appendChild(el("div", { class: "panel" }, panelKids));
+        stage.appendChild(card);
+        return stage;
+      }
+
+
+        function render(cards){
+          const main = document.getElementById("cards");
+          main.innerHTML = "";
+        
+          const sorted = [...cards].sort((a,b) => Number(a.card_id) - Number(b.card_id));
+        
+          for (const c of sorted){
+            const id = Number(c.card_id);
+            main.appendChild(makeStageCard({
+              id,
+              headline: c.new_headline || "",
+              body: c.new_body || ""
+            }));
+          }
+        
+          buildProgress(sorted.length);
+        
+          // extra runway at the end so last card releases cleanly
+          main.appendChild(el("div", { style: "height: 40vh" }, ""));
+        }
+        function buildProgress(count){
+          const nav = document.getElementById("progress");
+          nav.innerHTML = "";
+        
+          for (let i = 0; i < count; i++){
+            const b = document.createElement("button");
+            b.type = "button";
+            b.setAttribute("aria-label", `Go to section ${i+1}`);
+        
+        b.addEventListener("click", () => {
+          const stages = document.querySelectorAll(".stage");
+          const stage = stages[i];
+          if (stage) scrollStageToCenter(stage);
+        });
+
+        
+            nav.appendChild(b);
+          }
+        }
+function setupVisibilityObserver(){
+  const stages = Array.from(document.querySelectorAll(".stage"));
+  const dots = Array.from(document.querySelectorAll("#progress button"));
+
+  function setActive(idx){
+    stages.forEach((s,i) => s.classList.toggle("is-active", i === idx));
+    dots.forEach((d,i) => d.classList.toggle("is-active", i === idx));
+  }
+
+  // pick the most visible stage in the viewport
+  const io = new IntersectionObserver((entries) => {
+    let best = { idx: 0, ratio: 0 };
+
+    for (const e of entries){
+      const idx = stages.indexOf(e.target);
+      if (idx === -1) continue;
+
+      // keep your text reveal
+      if (e.isIntersecting) e.target.querySelector(".card")?.classList.add("is-visible");
+
+      // choose active stage by highest intersection ratio
+      if (e.intersectionRatio > best.ratio){
+        best = { idx, ratio: e.intersectionRatio };
+      }
+    }
+
+    // only switch when we have a meaningful winner (reduces jitter)
+    if (best.ratio > 0.35) setActive(best.idx);
+
+  }, { threshold: [0.25, 0.35, 0.45, 0.6, 0.75] });
+
+  stages.forEach(s => io.observe(s));
+
+  // default active
+  setActive(0);
+}
+    // background drift
+    (function backgroundDrift(){
+      const root = document.documentElement;
+      let lastY = window.scrollY || 0;
+      let lastT = performance.now();
+      let v = 0, raf = 0;
+
+      function clamp(x,a,b){ return Math.max(a, Math.min(b, x)); }
+
+      function tick(){
+        const now = performance.now();
+        const y = window.scrollY || 0;
+        const dt = Math.max(16, now - lastT);
+        const dy = y - lastY;
+
+        const vTarget = Math.abs(dy) / dt;
+        v = v * 0.86 + vTarget * 0.14;
+        const intensity = clamp(v * 18, 0, 1);
+        root.style.setProperty("--halo", (intensity * 0.9).toFixed(3));
+
+        const doc = document.documentElement;
+        const max = Math.max(1, doc.scrollHeight - doc.clientHeight);
+        const s = y / max;
+
+        // add slow continuous motion so background feels alive even when not scrolling
+        const t2 = now / 1800; // speed of ambient drift (bigger = slower)
+
+        const amp = 8 + intensity * 34;   // stronger overall motion
+        const px = (Math.sin(s * Math.PI * 2.0) * amp) + (Math.sin(t2) * 10);
+        const py = ((s - 0.5) * amp * 1.7) + (Math.cos(t2 * 0.9) * 8);
+        const hue = 18 + intensity * 22 + (Math.sin(t2 * 0.6) * 6);
+
+        root.style.setProperty("--px", px.toFixed(2) + "px");
+        root.style.setProperty("--py", py.toFixed(2) + "px");
+        root.style.setProperty("--hue", hue.toFixed(2) + "deg");
+
+        lastY = y; lastT = now;
+
+        if (intensity > 0.01) raf = requestAnimationFrame(tick);
+        else raf = 0;
+      }
+
+      function onScroll(){
+        if (!raf) raf = requestAnimationFrame(tick);
+      }
+
+      onScroll();
+      window.addEventListener("scroll", onScroll, { passive: true });
+      window.addEventListener("resize", onScroll);
+    })();
+
+    (async function(){
+      try{
+        const cards = await loadCSV("cards.csv");
+        render(cards);
+        setupVisibilityObserver();
+      } catch (e){
+        const main = document.getElementById("cards");
+        main.innerHTML = "";
+        main.appendChild(el("div", { class: "stage" }, [
+          el("section", { class: "card is-visible" }, [
+            el("div", { class: "panel" }, [
+              el("h2", {}, "Couldn’t load cards.csv"),
+              el("p", {}, String(e))
+            ])
+          ])
+        ]));
+      }
+    })();
+  </script>
+</body>
+</html>
